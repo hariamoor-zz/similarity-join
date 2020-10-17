@@ -1,30 +1,28 @@
 
 #include "simJoin.h"
 
-void formating(vector< triple<unsigned, unsigned, unsigned> > &results)
-{
-  sort(results.begin(), results.end(), [](const triple<unsigned, unsigned, unsigned> &t1, const triple<unsigned, unsigned, unsigned> &t2) {
+void formating(vector<triple<unsigned, unsigned, unsigned>> &results) {
+  sort(results.begin(), results.end(),
+       [](const triple<unsigned, unsigned, unsigned> &t1,
+          const triple<unsigned, unsigned, unsigned> &t2) {
+         if (t1.id1 != t2.id1)
+           return t1.id1 < t2.id1;
 
-    if (t1.id1 != t2.id1)
-      return t1.id1 < t2.id1;
+         if (t1.id2 != t2.id2)
+           return t1.id2 < t2.id2;
 
-    if (t1.id2 != t2.id2)
-      return t1.id2 < t2.id2;
-
-    return t1.ed < t2.ed;
-  });
+         return t1.ed < t2.ed;
+       });
 }
 
-void logTimeMessage(timeval &t1, timeval &t2, string message)
-{
-  cout << message << t2.tv_sec - t1.tv_sec + (t2.tv_usec - t1.tv_usec) / 1e6 << endl;
+void logTimeMessage(timeval &t1, timeval &t2, string message) {
+  cout << message << t2.tv_sec - t1.tv_sec + (t2.tv_usec - t1.tv_usec) / 1e6
+       << endl;
 }
 
-int main (int argc, char ** argv)
-{
+int main(int argc, char **argv) {
   timeval t1, t2, t3;
-  vector< triple<unsigned, unsigned, unsigned > > results;
-
+  vector<triple<unsigned, unsigned, unsigned>> results;
 
   cout << "Reading data begin " << endl;
 
@@ -34,7 +32,8 @@ int main (int argc, char ** argv)
   simJoin joiner(filename);
   gettimeofday(&t2, NULL);
 
-  cout << "Reading data done. " << joiner.getDataNum() << " strings in total." << endl;
+  cout << "Reading data done. " << joiner.getDataNum() << " strings in total."
+       << endl;
 
   string message1 = "IO Time: ";
   logTimeMessage(t1, t2, message1);
@@ -49,8 +48,7 @@ int main (int argc, char ** argv)
 
   formating(results);
 
-  for (unsigned i = 0; i < results.size(); i++) 
-  {
+  for (unsigned i = 0; i < results.size(); i++) {
     unsigned firstId = results[i].id1;
     string firstStr;
     joiner.getString(firstId, firstStr);
