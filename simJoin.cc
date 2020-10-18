@@ -32,7 +32,7 @@ bool simJoin::readData(const string &filename) {
 
 int min(int x, int y, int z) { return min(min(x, y), z); }
 
-int distance(string str1, string str2, int m, int n) {
+int distance(std::string& str1, std::string& str2, int m, int n) {
   // If first string is empty, the only option is to
   // insert all characters of second string into first
   if (m == 0)
@@ -65,9 +65,9 @@ bool simJoin::SimilarityJoin(
   for (unsigned i = 0; i < getDataNum(); i++) {
     for (unsigned j = i + 1; j < getDataNum(); j++) {
       string a, b;
-      // cout << "(a, b) = " << i << ", " << j << endl;
-      this->getString(i, a);
-      this->getString(j, b);
+
+      getString(i, a);
+      getString(j, b);
 
       unsigned d = distance(a, b, a.length(), b.length());
 

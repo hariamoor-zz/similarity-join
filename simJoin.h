@@ -29,3 +29,5 @@ private:
   vector<string> data;
   bool readData(const string &filename);
 };
+
+int distance(std::string&, std::string&, int, int);
