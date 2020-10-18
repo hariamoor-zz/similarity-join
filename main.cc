@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
   string message1 = "IO Time: ";
   logTimeMessage(t1, t2, message1);
 
-  unsigned edtau = 3;
+  unsigned edtau = 2;
   joiner.SimilarityJoin(edtau, results);
   gettimeofday(&t3, NULL);
 
