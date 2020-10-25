@@ -1,4 +1,10 @@
 #include "simJoin.h"
+#include <algorithm>
+#include <cmath>
+#include <math.h>
+#include <map>
+#include <memory>
+#include <set>
 #include <string>
 
 int simJoin::getDataNum() const { return data.size(); }
@@ -30,52 +36,52 @@ bool simJoin::readData(const string &filename) {
  * error if the similarity join operation is failed.
  */
 
-int min(int x, int y, int z) { return min(min(x, y), z); }
+class PassJoin {
+  typedef std::map<std::string, std::set<int>> InvertedIndex;
+  unsigned threshold;
+  simJoin& joiner;
+  std::vector<triple<unsigned, unsigned, unsigned>>& results;
+private:
+  std::map<int, std::map<int, InvertedIndex>> indices;
+public:
+  PassJoin(unsigned threshold, simJoin& joiner, std::vector<triple<unsigned, unsigned, unsigned>>& results) : threshold(threshold), joiner(joiner), results(results) {}
+  bool Initialize() {
+    int partitions = threshold + 1;
+    for(int id = 0; id < joiner.getDataNum(); id++) {
+      std::string curr;
+      joiner.getString(id, curr);
 
-int distance(std::string& str1, std::string& str2, int m, int n) {
-  // If first string is empty, the only option is to
-  // insert all characters of second string into first
-  if (m == 0)
-    return n;
+      int l = curr.length();
+      int k = l / partitions;
 
-  // If second string is empty, the only option is to
-  // remove all characters of first string
-  if (n == 0)
-    return m;
-
-  // If last characters of two strings are same, nothing
-  // much to do. Ignore last characters and get count for
-  // remaining strings.
-  if (str1[m - 1] == str2[n - 1])
-    return distance(str1, str2, m - 1, n - 1);
-
-
-  // If last characters are not same, consider all three
-  // operations on last character of first string, recursively
-  // compute minimum cost for all three operations and take
-  // minimum of three values.
-  return 1 + min(distance(str1, str2, m, n - 1),    // Insert
-                 distance(str1, str2, m - 1, n),    // Remove
-                 distance(str1, str2, m - 1, n - 1) // Replace
-             );
-}
-
-bool simJoin::SimilarityJoin(
-    unsigned threshold, vector<triple<unsigned, unsigned, unsigned>> &results) {
-  for (unsigned i = 0; i < getDataNum(); i++) {
-    for (unsigned j = i + 1; j < getDataNum(); j++) {
-      string a, b;
-
-      getString(i, a);
-      getString(j, b);
-
-      unsigned d = distance(a, b, a.length(), b.length());
-
-      if (d < threshold) {
-        triple<unsigned, unsigned, unsigned> t = {.id1 = i, .id2 = j, .ed = d};
-        results.push_back(t);
+      for(int i = 0, left = partitions; left; i += k, left--) {
+        std::string sub = (left == 1) ? curr.substr(i * k) : curr.substr(i * k, k);
+        indices[l][i][sub].insert(id);
       }
     }
+
+    return true;
+  };
+  bool Join();
+  unsigned distance(const std::string& s1, const std::string& s2) {
+    const std::size_t len1 = s1.size(), len2 = s2.size();
+    std::vector<std::vector<unsigned>> d(len1 + 1, std::vector<unsigned>(len2 + 1));
+
+    d[0][0] = 0;
+    for(unsigned i = 1; i <= len1; ++i) d[i][0] = i;
+    for(unsigned i = 1; i <= len2; ++i) d[0][i] = i;
+
+    for(unsigned i = 1; i <= len1; ++i)
+      for(unsigned j = 1; j <= len2; ++j)
+        d[i][j] = std::min({ d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1]
+            + (s1[i - 1] == s2[j - 1] ? 0 : 1) });
+
+    return d[len1][len2];
   }
+};
+
+bool simJoin::SimilarityJoin(
+                             unsigned int threshold,
+                             vector<triple<unsigned int, unsigned int, unsigned int>> &results) {
   return true;
 }
