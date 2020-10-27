@@ -7,16 +7,6 @@
 #include <vector>
 
 class PassJoin {
-  static inline int DJB_hash(const char *str, int len) {
-    unsigned hash = 5381;
-
-    for (int k = 0; k < len; k++) {
-      hash += (hash << 5) + str[k];
-    }
-
-    return (hash & 0x7FFFFFFF);
-  }
-
   static inline int edit_distance(const std::string &s1, const std::string &s2,
                            int THRESHOLD, int xpos = 0, int ypos = 0,
                            int xlen = -1, int ylen = -1) {
@@ -74,28 +64,17 @@ class PassJoin {
   };
 
   int D, N, PN;
-  vector<string> dict;
+  vector<string> dictionary;
   int maxDictLength = 0;
-  int minDictLength = 0x7FFFFFFF;
+  int minDictLength = INT32_MAX;
 
   std::vector<std::vector<std::vector<PIndex>>> partIndex;
-  // HashMap<int, vector<int>> **invLists;
-  // int **partPos;
-  // int **partLen;
-  // int *dist;
-  std::vector<std::vector<std::unordered_map<int, std::vector<int>>>> invLists;
-  std::vector<std::vector<int>> partPos, partLen;
-  std::vector<int> dist;
-
-  long long candNum = 0;
-  long long realNum = 0;
+  std::vector<std::vector<std::unordered_map<int, std::vector<int>>>> invertedIndex;
+  std::vector<std::vector<int>> partPosition, partLength;
+  std::vector<int> distance;
 
 public:
-  PassJoin(unsigned threshold, simJoin* joiner) {
-    D = threshold;
-    N = joiner->getDataNum();
-    PN = D + 1;
-
+  PassJoin(unsigned threshold, simJoin* joiner) : D(threshold), N(joiner->getDataNum()), PN(threshold + 1) {
     for (int i = 0; i < N; i++) {
       string out;
       joiner->getString(i, out);
@@ -109,44 +88,40 @@ public:
         minDictLength = l;
       }
 
-      dict.push_back(out);
+	  dictionary.insert(std::upper_bound(dictionary.begin(), dictionary.end(), out, [](const std::string& r, const std::string& s){ return r.length() < s.length(); }), out);
     }
 
-    sort(dict.begin(), dict.end(), [](const string &r, const string &s) {
-      return r.length() < s.length();
-    });
-
-    partLen =
+    partLength =
         std::vector<std::vector<int>>(PN, std::vector<int>(maxDictLength + 1));
-    partPos = std::vector<std::vector<int>>(
+    partPosition = std::vector<std::vector<int>>(
         PN + 1, std::vector<int>(maxDictLength + 1));
 
     partIndex = std::vector<std::vector<std::vector<PIndex>>>(
         PN, std::vector<std::vector<PIndex>>(maxDictLength + 1));
 
-    invLists =
+    invertedIndex =
         std::vector<std::vector<std::unordered_map<int, std::vector<int>>>>(
             PN, std::vector<std::unordered_map<int, std::vector<int>>>(
                     maxDictLength + 1));
-    dist = std::vector<int>(maxDictLength + 2);
+    distance = std::vector<int>(maxDictLength + 2);
 
     for (int lp = 0; lp <= maxDictLength + 1; lp++) {
-      dist[lp] = N;
+      distance[lp] = N;
     }
 
     for (int len = minDictLength; len <= maxDictLength; len++) {
-      partPos[0][len] = 0;
-      partLen[0][len] = len / PN;
-      partPos[PN][len] = len;
+      partPosition[0][len] = 0;
+      partLength[0][len] = len / PN;
+      partPosition[PN][len] = len;
     }
 
     for (int pid = 1; pid < PN; pid++) {
       for (int len = minDictLength; len <= maxDictLength; len++) {
-        partPos[pid][len] = partPos[pid - 1][len] + partLen[pid - 1][len];
+        partPosition[pid][len] = partPosition[pid - 1][len] + partLength[pid - 1][len];
         if (pid == (PN - len % PN)) {
-          partLen[pid][len] = partLen[pid - 1][len] + 1;
+          partLength[pid][len] = partLength[pid - 1][len] + 1;
         } else {
-          partLen[pid][len] = partLen[pid - 1][len];
+          partLength[pid][len] = partLength[pid - 1][len];
         }
       }
     }
@@ -155,33 +130,33 @@ public:
   bool prepare() {
     int clen = 0;
     for (int id = 0; id < N; id++) {
-      if (clen == (int)dict[id].length())
+      if (clen == (int)dictionary[id].length())
         continue;
-      for (int lp = clen + 1; lp <= (int)dict[id].length(); lp++)
-        dist[lp] = id;
-      clen = dict[id].length();
+      for (int lp = clen + 1; lp <= (int)dictionary[id].length(); lp++)
+        distance[lp] = id;
+      clen = dictionary[id].length();
     }
 
     clen = 0;
     for (int id = 0; id < N; id++) {
-      if (clen == (int)dict[id].length())
+      if (clen == (int)dictionary[id].length())
         continue;
-      clen = dict[id].length();
+      clen = dictionary[id].length();
 
       for (int pid = 0; pid < PN; pid++) {
         for (int len = max(clen - D, minDictLength); len <= clen; len++) {
-          if (dist[len] == dist[len + 1])
+          if (distance[len] == distance[len + 1])
             continue;
 
           for (int stPos =
-                   std::max({0, partPos[pid][len] - pid,
-                             partPos[pid][len] + (clen - len) - (D - pid)});
+                   std::max({0, partPosition[pid][len] - pid,
+                             partPosition[pid][len] + (clen - len) - (D - pid)});
                stPos <=
-               std::min({clen - partLen[pid][len], partPos[pid][len] + pid,
-                         partPos[pid][len] + (clen - len) + (D - pid)});
+               std::min({clen - partLength[pid][len], partPosition[pid][len] + pid,
+                         partPosition[pid][len] + (clen - len) + (D - pid)});
                stPos++) {
-            partIndex[pid][clen].emplace_back(stPos, partPos[pid][len],
-                                              partLen[pid][len], len);
+            partIndex[pid][clen].emplace_back(stPos, partPosition[pid][len],
+                                              partLength[pid][len], len);
           }
         }
       }
@@ -193,34 +168,32 @@ public:
   bool perform_join(vector<triple<unsigned, unsigned, unsigned>> &results) {
     for (int id = 0; id < N; id++) {
       std::unordered_set<int> checked_ids;
-      int clen = dict[id].length();
+      int clen = dictionary[id].length();
       for (int partId = 0; partId < PN; partId++) {
         for (int lp = 0; lp < (int)partIndex[partId][clen].size(); lp++) {
-          int stPos = partIndex[partId][clen][lp].stPos;
-          int Lo = partIndex[partId][clen][lp].Lo;
-          int pLen = partIndex[partId][clen][lp].partLen;
-          int len = partIndex[partId][clen][lp].len;
+          const int stPos = partIndex[partId][clen][lp].stPos;
+          const int Lo = partIndex[partId][clen][lp].Lo;
+          const int pLen = partIndex[partId][clen][lp].partLen;
+          const int len = partIndex[partId][clen][lp].len;
 
-          int hash_value = PassJoin::DJB_hash(dict[id].c_str() + stPos, pLen);
-          if (invLists[partId][len].count(hash_value) == 0)
+          int hash_value = std::hash<std::string>{}(dictionary[id].substr(stPos, pLen));
+          if (invertedIndex[partId][len].count(hash_value) == 0)
             continue;
-          for (int cand : invLists[partId][len][hash_value]) {
+          for (int cand : invertedIndex[partId][len][hash_value]) {
             if (checked_ids.find(cand) == checked_ids.end()) {
-              ++candNum;
               if (partId == D)
                 checked_ids.insert(cand);
-              if (partId == 0 || PassJoin::edit_distance(dict[cand], dict[id], partId, 0,
+              if (partId == 0 || PassJoin::edit_distance(dictionary[cand], dictionary[id], partId, 0,
                                                0, Lo, stPos) <= partId) {
                 if (partId == 0)
                   checked_ids.insert(cand);
                 if (partId == D ||
-                    PassJoin::edit_distance(dict[cand], dict[id], D - partId, Lo + pLen,
+                    PassJoin::edit_distance(dictionary[cand], dictionary[id], D - partId, Lo + pLen,
                                   stPos + pLen) <= D - partId) {
-                  auto ed = PassJoin::edit_distance(dict[cand], dict[id], D);
+                  auto ed = PassJoin::edit_distance(dictionary[cand], dictionary[id], D);
 
                   if (ed <= D) {
                     checked_ids.insert(cand);
-                    realNum++;
                     results.push_back({.id1 = (unsigned)id,
                                        .id2 = (unsigned)cand,
                                        .ed = (unsigned)ed});
@@ -233,9 +206,9 @@ public:
       }
 
       for (int partId = 0; partId < PN; partId++) {
-        int pLen = partLen[partId][clen];
-        int stPos = partPos[partId][clen];
-        invLists[partId][clen][DJB_hash(dict[id].c_str() + stPos, pLen)]
+        int pLen = partLength[partId][clen];
+        int stPos = partPosition[partId][clen];
+        invertedIndex[partId][clen][std::hash<std::string>{}(dictionary[id].substr(stPos, pLen))]
             .push_back(id);
       }
     }
